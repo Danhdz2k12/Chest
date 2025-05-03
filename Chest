@@ -1,15 +1,9 @@
--- Khai báo biến toàn cục
+-- Khai báo biến
 local lp = game.Players.LocalPlayer
 local count = 0
-local isRunning = true -- Biến điều khiển vòng lặp
+local autoChestEnabled = false
 
--- Kiểm tra và chờ nhân vật
-if not lp or not lp.Character then
-    lp = game.Players.LocalPlayer
-    lp.CharacterAdded:Wait()
-end
-
--- Định nghĩa danh sách các khu vực
+-- Danh sách khu vực
 local areas = {
     "Colosseum", "Desert", "Fishmen", "Fountain",
     "Ice", "Jungle", "Magma", "MarineBase",
@@ -18,74 +12,87 @@ local areas = {
     "Town", "Windmill"
 }
 
--- Hàm teleport đến một rương
-local function teleportToChest(area, index)
-    if not workspace.Map then
-        warn("Map not found in workspace")
-        return
-    end
-    local chestPath = workspace.Map:FindFirstChild(area)
-    if chestPath then
-        local chests = chestPath:FindFirstChild("Chests")
-        if chests then
-            local chestList = chests:GetChildren()
-            if index > #chestList or index < 1 then
-                warn("Index out of range for area: " .. area)
-                return
-            end
-            local targetChest = chestList[index]
-            if targetChest and targetChest:IsA("BasePart") then
-                lp.Character.HumanoidRootPart.CFrame = targetChest.CFrame
-                print("Teleported to chest " .. index .. " in " .. area)
-            end
-        else
-            warn("Chests not found in " .. area)
+-- Hàm tạo GUI
+local function createToggleGui()
+    local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+    ScreenGui.Name = "AutoChestGui"
+
+    local Button = Instance.new("TextButton", ScreenGui)
+    Button.Size = UDim2.new(0, 160, 0, 40)
+    Button.Position = UDim2.new(0, 10, 0, 100)
+    Button.Text = "Bật Auto Chest"
+    Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.Font = Enum.Font.SourceSansBold
+    Button.TextSize = 20
+    Button.BorderSizePixel = 0
+    Button.AutoButtonColor = true
+
+    Button.MouseButton1Click:Connect(function()
+        autoChestEnabled = not autoChestEnabled
+        Button.Text = autoChestEnabled and "Tắt Auto Chest" or "Bật Auto Chest"
+    end)
+end
+
+-- Di chuyển đến đảo
+local function moveToArea(area)
+    local areaPart = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild(area)
+    if areaPart then
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = areaPart.CFrame + Vector3.new(0, 10, 0)
+            task.wait(2)
         end
-    else
-        warn("Area " .. area .. " not found in Map")
     end
 end
 
--- Hàm reset nhân vật
+-- Dịch chuyển đến rương
+local function teleportToChest(area, index)
+    local chestPath = workspace.Map and workspace.Map:FindFirstChild(area)
+    if chestPath then
+        local chests = chestPath:FindFirstChild("Chests")
+        if chests then
+            local targetChest = chests:GetChildren()[index]
+            if targetChest and targetChest:IsA("BasePart") then
+                local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.CFrame = targetChest.CFrame
+                end
+            end
+        end
+    end
+end
+
+-- Reset nhân vật
 local function resetCharacter()
     local character = lp.Character or lp.CharacterAdded:Wait()
     character:BreakJoints()
 end
 
--- Hàm vòng lặp chính chạy không đồng bộ
-local function mainLoop()
-    spawn(function()
-        while isRunning do
+-- Vòng lặp chính
+task.spawn(function()
+    while true do
+        if autoChestEnabled then
             for _, area in ipairs(areas) do
-                local chestPath = workspace.Map:FindFirstChild(area)
-                if chestPath and chestPath:FindFirstChild("Chests") then
-                    local chests = chestPath:FindFirstChild("Chests")
-                    local chestCount = #chests:GetChildren()
-                    for index = 1, chestCount do
-                        teleportToChest(area, index)
-                        count = count + 1
-                        wait(0.1) -- Tăng thời gian chờ để giảm tải
-                        if count >= 1000 then
-                            resetCharacter()
-                            count = 0
-                            wait(10)
-                            break
-                        end
+                if not autoChestEnabled then break end
+                moveToArea(area)
+                for index = 1, 18 do
+                    if not autoChestEnabled then break end
+                    teleportToChest(area, index)
+                    count += 1
+                    task.wait(0.1)
+                    if count >= 1000 then
+                        resetCharacter()
+                        count = 0
+                        task.wait(10)
+                        break
                     end
                 end
-                if count == 0 then
-                    break
-                end
             end
-            wait(1) -- Thêm delay lớn hơn giữa các chu kỳ khu vực
         end
-    end)
-end
+        task.wait(0.5)
+    end
+end)
 
--- Khởi chạy vòng lặp chính
-mainLoop()
-
--- Hàm dừng script (có thể gọi thủ công nếu cần)
-local function stopScript()
-    isRunning = false
-end
+-- Khởi tạo GUI
+createToggleGui()
