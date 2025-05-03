@@ -1,0 +1,83 @@
+-- Khai báo biến toàn cục
+local lp = game.Players.LocalPlayer
+local count = 0
+
+-- Kiểm tra và chờ nhân vật
+if not lp or not lp.Character then
+    lp = game.Players.LocalPlayer
+    lp.CharacterAdded:Wait()
+end
+
+-- Định nghĩa danh sách các khu vực
+local areas = {
+    "Colosseum", "Desert", "Fishmen", "Fountain",
+    "Ice", "Jungle", "Magma", "MarineBase",
+    "MarineStart", "MobBoss", "Pirate", "Prison",
+    "Sky", "SkyArea1", "SkyArea2", "TeleportSpawn",
+    "Town", "Windmill"
+}
+
+-- Hàm teleport đến một rương
+local function teleportToChest(area, index)
+    if not workspace.Map then
+        warn("Map not found in workspace")
+        return
+    end
+    local chestPath = workspace.Map:FindFirstChild(area)
+    if chestPath then
+        local chests = chestPath:FindFirstChild("Chests")
+        if chests then
+            local chestList = chests:GetChildren()
+            if index > #chestList or index < 1 then
+                warn("Index out of range for area: " .. area)
+                return
+            end
+            local targetChest = chestList[index]
+            if targetChest and targetChest:IsA("BasePart") then
+                lp.Character.HumanoidRootPart.CFrame = targetChest.CFrame
+                print("Teleported to chest " .. index .. " in " .. area)
+            end
+        else
+            warn("Chests not found in " .. area)
+        end
+    else
+        warn("Area " .. area .. " not found in Map")
+    end
+end
+
+-- Hàm reset nhân vật
+local function resetCharacter()
+    local character = lp.Character or lp.CharacterAdded:Wait()
+    character:BreakJoints()
+end
+
+-- Hàm vòng lặp chính
+local function mainLoop()
+    while true do
+        local startTime = tick()
+        for _, area in ipairs(areas) do
+            local chestPath = workspace.Map:FindFirstChild(area)
+            if chestPath and chestPath:FindFirstChild("Chests") then
+                local chests = chestPath:FindFirstChild("Chests")
+                local chestCount = #chests:GetChildren()
+                for index = 1, chestCount do
+                    teleportToChest(area, index)
+                    count = count + 1
+                    wait(0.01)
+                    if count >= 1000 then
+                        resetCharacter()
+                        count = 0
+                        wait(10)
+                        break
+                    end
+                end
+            end
+            if count == 0 then
+                break
+            end
+        end
+    end
+end
+
+-- Khởi chạy vòng lặp chính
+mainLoop()
